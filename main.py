@@ -14,7 +14,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 async def load_cogs():
-    cog_files = ["core", "panels", "assignment", "moderation", "stats"]
+    cog_files = ["core", "panels", "assignment", "moderation", "stats", "utils"]
     for cog in cog_files:
         try:
             await bot.load_extension(f"cogs.{cog}")
