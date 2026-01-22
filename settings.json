@@ -1,0 +1,14 @@
+{
+  "project_name": "Greenfild Project",
+  "welcome_message": "Добро пожаловать на сервер Greenfild GTA 5\n\n🔗 Ссылки:\n{social_links}\n\nС уважением,\nАдминистрация Greenfild Project",
+  "moderation": {
+    "max_warns_to_ban": 3,
+    "warn_duration_days": 7
+  },
+  "currency_name": "G$",
+  "tech_support_category": "🔧 Техподдержка",
+  "assets": {
+    "logo_url": "attachment://logo.png",
+    "banner_url": "attachment://banner.png"
+  }
+}
