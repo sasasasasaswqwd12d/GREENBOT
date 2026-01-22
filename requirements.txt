@@ -1,0 +1,11 @@
+# Discord Bot
+discord.py>=2.3.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# HTTP Client (входит в discord.py, но явно укажем)
+aiohttp>=3.8.0
+
+# Встроенные модули (НЕ требуют установки):
+# sqlite3, json, os, sys, time, datetime, asyncio и др.
