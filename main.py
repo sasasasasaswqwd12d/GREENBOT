@@ -41,6 +41,15 @@ async def main():
     await load_cogs()
     await bot.start(os.getenv("DISCORD_TOKEN"))
 
+@bot.command(name="sync")
+@commands.is_owner()
+async def manual_sync(ctx):
+    try:
+        synced = await bot.tree.sync()
+        await ctx.send(f"✅ Синхронизировано {len(synced)} команд глобально.")
+    except Exception as e:
+        await ctx.send(f"❌ Ошибка: {e}")
+
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
     if not token:
