@@ -41,11 +41,16 @@ async def main():
     await load_cogs()
     await bot.start(os.getenv("DISCORD_TOKEN"))
 
-@bot.command(name="syncguild")
+@bot.command(name="sync")
 @commands.is_owner()
-async def sync_guild(ctx):
-    synced = await bot.tree.sync(guild=ctx.guild)
-    await ctx.send(f"✅ Синхронизировано {len(synced)} команд на этом сервере.")
+async def sync_manual(ctx):
+    # Явно добавляем команды
+    @bot.tree.command(name="тест", description="Тестовая команда")
+    async def test_cmd(interaction: discord.Interaction):
+        await interaction.response.send_message("Работает!")
+
+    synced = await bot.tree.sync()
+    await ctx.send(f"✅ Синхронизировано {len(synced)} команд.")
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
