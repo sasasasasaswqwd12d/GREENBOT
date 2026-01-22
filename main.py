@@ -18,9 +18,9 @@ async def load_cogs():
     for cog in cog_files:
         try:
             await bot.load_extension(f"cogs.{cog}")
-            print(f"📦 Модуль cogs.{cog} загружен")
+            print(f"✅ УСПЕХ: cogs.{cog} загружен")
         except Exception as e:
-            print(f"❌ Ошибка загрузки cogs.{cog}: {e}")
+            print(f"❌ ОШИБКА загрузки cogs.{cog}: {type(e).__name__}: {e}")
 
 @bot.event
 async def on_ready():
@@ -40,17 +40,6 @@ async def on_ready():
 async def main():
     await load_cogs()
     await bot.start(os.getenv("DISCORD_TOKEN"))
-
-@bot.command(name="sync")
-@commands.is_owner()
-async def sync_manual(ctx):
-    # Явно добавляем команды
-    @bot.tree.command(name="тест", description="Тестовая команда")
-    async def test_cmd(interaction: discord.Interaction):
-        await interaction.response.send_message("Работает!")
-
-    synced = await bot.tree.sync()
-    await ctx.send(f"✅ Синхронизировано {len(synced)} команд.")
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
