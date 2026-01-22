@@ -64,7 +64,7 @@ async def main():
     await load_cogs()
     await bot.start(os.getenv("DISCORD_TOKEN"))
 
-if __name __ == "__main__":
+if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
     if not token:
         print("❌ DISCORD_TOKEN не найден в .env!")
