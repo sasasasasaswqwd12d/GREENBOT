@@ -4,6 +4,12 @@ import os
 import json
 from utils.helpers import get_role_id
 
+def is_owner():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        owner_id = int(os.getenv("OWNER_ID", 0))
+        return interaction.user.id == owner_id
+    return discord.app_command.check(predicate)
+
 class Core(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -54,8 +60,9 @@ class Core(commands.Cog):
         except Exception as e:
             print(f"❌ Ошибка отправки приветствия: {e}")
 
+
     @discord.app_command.command(name="перезагрузить_приветствие", description="Тестовая команда для владельца")
-    @commands.is_owner()
+    @is_owner()
     async def reload_welcome(self, interaction: discord.Interaction):
         """Тестовая команда — отправляет приветствие самому себе"""
         try:

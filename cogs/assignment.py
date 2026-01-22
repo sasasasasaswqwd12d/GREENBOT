@@ -76,10 +76,10 @@ class ManagementPanelView(discord.ui.View):
     async def assign_movie(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(AssignModal(self.bot, "movie", "медиа"))
 
-    @discord.ui.button(label="🔨 Глобальный бан", style=discord.ButtonStyle.danger, emoji="🔨")
-    async def global_ban_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        from cogs.moderation import GlobalBanModal
-        await interaction.response.send_modal(GlobalBanModal())
+#    @discord.ui.button(label="🔨 Глобальный бан", style=discord.ButtonStyle.danger, emoji="🔨")
+#    async def global_ban_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+#        from cogs.moderation import GlobalBanModal
+#        await interaction.response.send_modal(GlobalBanModal())
 
 class AssignModal(discord.ui.Modal):
     def __init__(self, bot, role_type: str, role_name: str):

@@ -6,24 +6,109 @@ import aiohttp
 import os
 from utils.helpers import get_role_id
 
+
+# === Модальное окно для глобального бана (используется из других Cogs) ===
+class GlobalBanModal(discord.ui.Modal, title="🌍 Глобальный бан"):
+    def __init__(self):
+        super().__init__()
+        self.user_id = discord.ui.TextInput(
+            label="ID пользователя",
+            placeholder="123456789012345678",
+            required=True,
+            max_length=20
+        )
+        self.duration = discord.ui.TextInput(
+            label="Срок (например: 7d, 0=навсегда)",
+            default="0",
+            required=True,
+            max_length=10
+        )
+        self.reason = discord.ui.TextInput(
+            label="Причина",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=300
+        )
+        self.add_item(self.user_id)
+        self.add_item(self.duration)
+        self.add_item(self.reason)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        cog = interaction.client.get_cog("Moderation")
+        if not cog:
+            await interaction.response.send_message("❌ Модуль модерации недоступен.", ephemeral=True)
+            return
+
+        try:
+            user_id = int(self.user_id.value.strip())
+            user = await interaction.client.fetch_user(user_id)
+        except (ValueError, discord.NotFound):
+            await interaction.response.send_message("❌ Неверный ID пользователя или пользователь не найден.", ephemeral=True)
+            return
+
+        try:
+            # Вызываем команду напрямую
+            await cog.global_ban(interaction, user, self.duration.value, self.reason.value)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Ошибка при бане: {e}", ephemeral=True)
+
+
+# === Основной Cog модерации ===
 class Moderation(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.check_expired_warns.start()
 
+    def has_moderator_role(self, user: discord.Member) -> bool:
+        """Проверяет, есть ли у пользователя роль модератора"""
+        mod_roles = ["chief_admin", "deputy_chief", "chief_curator", "senior_admin", "admin"]
+        for role_key in mod_roles:
+            role_id = get_role_id(role_key)
+            if role_id and role_id in [r.id for r in user.roles]:
+                return True
+        return False
+
+    def parse_duration(self, s: str) -> int:
+        """Преобразует '7d', '2h' в секунды. '0' = навсегда."""
+        if s == "0":
+            return 0
+        unit = s[-1].lower()
+        try:
+            amount = int(s[:-1])
+        except ValueError:
+            return 0
+        mult = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}
+        return amount * mult.get(unit, 0)
+
+    async def send_ban_webhook(self, url: str, user: discord.User, moderator: discord.User, reason: str, expires: str):
+        """Отправляет уведомление о бане в webhook"""
+        async with aiohttp.ClientSession() as session:
+            embed = {
+                "title": "🌍 Глобальный бан",
+                "description": f"**Пользователь:** {user.mention}\n**Модератор:** {moderator.mention}\n**Причина:** {reason}\n**Срок:** {expires}",
+                "color": 0xe74c3c,
+                "timestamp": discord.utils.utcnow().isoformat()
+            }
+            payload = {
+                "username": "Greenfild Ban Sync",
+                "avatar_url": "https://i.imgur.com/5GkzFQl.png",
+                "embeds": [embed]
+            }
+            try:
+                await session.post(url, json=payload)
+            except Exception as e:
+                print(f"Ошибка отправки webhook: {e}")
+
     @discord.app_command.command(name="глобалбан", description="Забанить пользователя на всех серверах проекта")
     async def global_ban(self, interaction: discord.Interaction, пользователь: discord.User, срок: str = "0", причина: str = "Не указана"):
-        """Глобальный бан с синхронизацией через webhook"""
         if not self.has_moderator_role(interaction.user):
             await interaction.response.send_message("❌ У вас нет прав на выдачу банов.", ephemeral=True)
             return
 
-        # Парсим срок
         seconds = self.parse_duration(срок)
         expires_at = int(time.time()) + seconds if seconds > 0 else None
         expires_str = "навсегда" if expires_at is None else срок
 
-        # Сохраняем в БД
         conn = sqlite3.connect("greenfild.db")
         c = conn.cursor()
         c.execute(
@@ -33,18 +118,14 @@ class Moderation(commands.Cog):
         conn.commit()
         conn.close()
 
-        # Кикаем со всех серверов проекта
         ban_count = 0
         for guild in self.bot.guilds:
-            member = guild.get_member(пользователь.id)
-            if member:
-                try:
-                    await guild.ban(пользователь, reason=f"Глобальный бан: {причина}")
-                    ban_count += 1
-                except discord.Forbidden:
-                    pass
+            try:
+                await guild.ban(пользователь, reason=f"Глобальный бан: {причина}")
+                ban_count += 1
+            except discord.Forbidden:
+                pass
 
-        # Отправляем в webhook (если указан)
         webhook_url = os.getenv("BAN_SYNC_WEBHOOK_URL")
         if webhook_url:
             await self.send_ban_webhook(webhook_url, пользователь, interaction.user, причина, expires_str)
@@ -56,7 +137,7 @@ class Moderation(commands.Cog):
         )
 
     @discord.app_command.command(name="глобалразбан", description="Снять глобальный бан")
-    async def global_unban(self, interaction: discord.Interaction, пользователь: discord.User):
+    async def global_unban(self, interaction: discord.Interegration, пользователь: discord.User):
         if not self.has_moderator_role(interaction.user):
             await interaction.response.send_message("❌ У вас нет прав на снятие банов.", ephemeral=True)
             return
@@ -69,7 +150,6 @@ class Moderation(commands.Cog):
         conn.close()
 
         if deleted:
-            # Разбаниваем на всех серверах
             unban_count = 0
             for guild in self.bot.guilds:
                 try:
@@ -108,7 +188,6 @@ class Moderation(commands.Cog):
 
         max_warns = 3
         if active_warns >= max_warns:
-            # Авто-бан
             try:
                 await interaction.guild.ban(участник, reason=f"Превышено количество предупреждений ({active_warns})")
                 await interaction.response.send_message(
@@ -153,51 +232,9 @@ class Moderation(commands.Cog):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
-
-    def has_moderator_role(self, user: discord.Member) -> bool:
-        """Проверяет, есть ли у пользователя роль модератора"""
-        mod_roles = ["chief_admin", "deputy_chief", "chief_curator", "senior_admin", "admin"]
-        for role_key in mod_roles:
-            role_id = get_role_id(role_key)
-            if role_id and role_id in [r.id for r in user.roles]:
-                return True
-        return False
-
-    def parse_duration(self, s: str) -> int:
-        """Преобразует '7d', '2h' в секунды"""
-        if s == "0":
-            return 0
-        unit = s[-1].lower()
-        try:
-            amount = int(s[:-1])
-        except ValueError:
-            return 0
-        mult = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}
-        return amount * mult.get(unit, 0)
-
-    async def send_ban_webhook(self, url: str, user: discord.User, moderator: discord.User, reason: str, expires: str):
-        """Отправляет уведомление о бане в webhook"""
-        async with aiohttp.ClientSession() as session:
-            embed = {
-                "title": "🌍 Глобальный бан",
-                "description": f"**Пользователь:** {user.mention}\n**Модератор:** {moderator.mention}\n**Причина:** {reason}\n**Срок:** {expires}",
-                "color": 0xe74c3c,
-                "timestamp": discord.utils.utcnow().isoformat()
-            }
-            payload = {
-                "username": "Greenfild Ban Sync",
-                "avatar_url": "https://i.imgur.com/5GkzFQl.png",
-                "embeds": [embed]
-            }
-            try:
-                await session.post(url, json=payload)
-            except Exception as e:
-                print(f"Ошибка отправки webhook: {e}")
-
     @tasks.loop(hours=1)
     async def check_expired_warns(self):
-        """Автоматически удаляет просроченные варны"""
+        """Удаляет просроченные предупреждения (старше 7 дней)"""
         conn = sqlite3.connect("greenfild.db")
         c = conn.cursor()
         now = int(time.time())
@@ -208,6 +245,7 @@ class Moderation(commands.Cog):
     @check_expired_warns.before_loop
     async def before_check_warns(self):
         await self.bot.wait_until_ready()
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
